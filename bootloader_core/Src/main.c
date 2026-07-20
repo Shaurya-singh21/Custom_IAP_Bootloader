@@ -18,7 +18,8 @@ typedef enum
 	STATE_CRC = (1 << 1),
 	STATE_CHECKSUM = (1 << 2),
 	STATE_JMP_TO_MAIN_APP = (1 << 3),
-	STATE_GOT_FILE_SIZE = (1 << 4)
+	STATE_GOT_FILE_SIZE = (1 << 4),
+	STATE_SEND_MENU = (1 << 5)
 } state_t;
 
 static const uint32_t sector_end_addr[6] = {0x0800BFFF, 0x0800FFFF, 0x08017FFF,
@@ -279,8 +280,7 @@ int main(void)
 					;
 				GPIOC->MODER &= ~(GPIO_MODER_MODE13);
 				TIM6->CR1 &= ~TIM_CR1_CEN;
-				uart_send((char *)menu);
-				reflect = 1;
+				state |= STATE_SEND_MENU;
 				state |= STATE_MAIN_MENU;
 				break;
 			}
@@ -290,14 +290,18 @@ int main(void)
 			jump_to_main_app();
 			if (state & STATE_JMP_TO_MAIN_APP)
 			{
-				state |= STATE_MAIN_MENU;
+				state |= (STATE_MAIN_MENU | STATE_SEND_MENU);
 				state &= ~STATE_JMP_TO_MAIN_APP;
-				uart_send((char *)menu);
-				reflect = 1;
 			}
 		}
 		while (state & STATE_MAIN_MENU)
 		{
+			if (state & STATE_SEND_MENU)
+			{
+				state &= ~STATE_SEND_MENU;
+				uart_send((char *)menu);
+				reflect = 1;
+			}
 			while (reflect)
 			{
 				uart_receive();
@@ -339,12 +343,14 @@ int main(void)
 				if (state & STATE_CHECKSUM)
 				{
 					state &= ~STATE_CHECKSUM;
+					state |= STATE_SEND_MENU;
 					continue;
 				}
 				get_crc_val_and_check();
 				if (state & STATE_CRC)
 				{
 					state &= ~STATE_CRC;
+					state |= STATE_SEND_MENU;
 					uart_send("Corrupted CRC! Retry again\r\n");
 					continue;
 				}
@@ -353,6 +359,7 @@ int main(void)
 				if (state & STATE_JMP_TO_MAIN_APP)
 				{
 					state &= ~STATE_JMP_TO_MAIN_APP;
+					state |= STATE_SEND_MENU;
 					continue;
 				}
 			}
@@ -363,6 +370,7 @@ int main(void)
 				{
 					uart_send("Invalid app... \r\n");
 					state &= ~STATE_JMP_TO_MAIN_APP;
+					state |= STATE_SEND_MENU;
 				}
 			}
 			else
@@ -370,7 +378,6 @@ int main(void)
 				uart_send("Kindly enter correct command...\r\n");
 			}
 			ptr = 0;
-			reflect = 1;
 		}
 	}
 }

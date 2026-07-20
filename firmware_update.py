@@ -60,7 +60,6 @@ def stdin_thread(ser):
 def main():
     actual_size, packet_count, padded_data = process_and_pad_binary(BINARY_PATH)
     calculated_crc = stm32_crc32(padded_data)
-
     print(f"Loaded firmware: {actual_size} bytes ({packet_count} packets after padding).")
     print(f"Pre-computed target verification CRC32 (MPEG-2): 0x{calculated_crc:08X}")
 
